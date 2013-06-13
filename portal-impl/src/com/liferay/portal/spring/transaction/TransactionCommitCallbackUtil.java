@@ -29,18 +29,30 @@ public class TransactionCommitCallbackUtil {
 	public static void registerCallback(Callable<?> callable) {
 		List<List<Callable<?>>> callbackListList =
 			_callbackListListThreadLocal.get();
+	if (callbackListList.isEmpty()) {
 
-		int index = callbackListList.size() - 1;
+			// Not within a transaction boundary, should only happen during an
+			// upgrade and verify process. See DBUpgrader#_disableTransactions.
 
-		List<Callable<?>> callableList = callbackListList.get(index);
+			try {
+				callable.call();
+			}
+			catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}else{
+			int index = callbackListList.size() - 1;
 
-		if (callableList == Collections.EMPTY_LIST) {
-			callableList = new ArrayList<Callable<?>>();
+			List<Callable<?>> callableList = callbackListList.get(index);
 
-			callbackListList.set(index, callableList);
+			if (callableList == Collections.EMPTY_LIST) {
+				callableList = new ArrayList<Callable<?>>();
+	
+				callbackListList.set(index, callableList);
+			}
+
+			callableList.add(callable);
 		}
-
-		callableList.add(callable);
 	}
 
 	protected static List<Callable<?>> popCallbackList() {
